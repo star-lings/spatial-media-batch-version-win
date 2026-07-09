@@ -38,49 +38,61 @@ def clean_build_directories():
         if not retry_rmtree(directory_name):
             print(f"Warning: Proceeding without cleaning {directory_name}")
 
-def get_executable_name():
-    """Get platform-specific executable name"""
+TARGETS = {
+    'single': ('spatial_media_metadata_injector.spec', 'Spatial Media Metadata Injector'),
+    'batch': ('spatial_media_batch_injector.spec', 'Spatial Media Batch Injector'),
+}
+
+
+def get_executable_name(base_name):
+    """Get platform-specific executable name for a given base app name"""
     platform_name = get_platform_name()
     if platform_name == 'windows':
-        return 'Spatial Media Metadata Injector.exe'
+        return f'{base_name}.exe'
     elif platform_name == 'macos':
-        return 'Spatial Media Metadata Injector.app'
+        return f'{base_name}.app'
     else:
-        return 'Spatial Media Metadata Injector'
+        return base_name
 
-def build_executable():
-    """Build the executable for the current platform"""
+def build_executable(targets=None):
+    """Build the executable(s) for the current platform.
+
+    targets: iterable of keys from TARGETS, defaults to all of them.
+    """
     # Clean previous builds
     try:
         clean_build_directories()
     except Exception as error:
         print(f"Warning: Error during cleanup: {error}")
         print("Attempting to continue with build...")
-    
-    # Get the specification file path
-    specification_file = os.path.join('spatialmedia', 'spatial_media_metadata_injector.spec')
-    
-    # Build command
-    command = ['pyinstaller', '--clean', specification_file]
-    
-    try:
-        subprocess.check_call(command)
-        platform_name = get_platform_name()
-        exe_name = get_executable_name()
-        print(f"Successfully built executable for {platform_name}")
-        
-        # Show output location
-        print(f"Output: ./dist/{exe_name}")
-        
-        # Set executable permissions for Unix-like systems
-        if platform_name in ('linux', 'macos'):
-            output_path = os.path.join('dist', exe_name)
-            if os.path.exists(output_path):
-                os.chmod(output_path, 0o755)
-                
-    except subprocess.CalledProcessError as error:
-        print(f"Error building executable: {error}")
-        sys.exit(1)
+
+    for key in (targets or TARGETS.keys()):
+        spec_name, base_name = TARGETS[key]
+        specification_file = os.path.join('spatialmedia', spec_name)
+        command = ['pyinstaller', '--clean', specification_file]
+
+        try:
+            subprocess.check_call(command)
+            platform_name = get_platform_name()
+            exe_name = get_executable_name(base_name)
+            print(f"Successfully built '{key}' executable for {platform_name}")
+            print(f"Output: ./dist/{exe_name}")
+
+            # Set executable permissions for Unix-like systems
+            if platform_name in ('linux', 'macos'):
+                output_path = os.path.join('dist', exe_name)
+                if os.path.exists(output_path):
+                    os.chmod(output_path, 0o755)
+
+        except subprocess.CalledProcessError as error:
+            print(f"Error building '{key}' executable: {error}")
+            sys.exit(1)
 
 if __name__ == "__main__":
-    build_executable()
+    requested = sys.argv[1:] or None
+    if requested:
+        unknown = set(requested) - set(TARGETS)
+        if unknown:
+            print(f"Unknown target(s): {', '.join(unknown)}. Valid: {', '.join(TARGETS)}")
+            sys.exit(1)
+    build_executable(requested)

@@ -1,0 +1,46 @@
+name: Build Windows executables
+
+# PyInstaller does not cross-compile: a Windows .exe can only be produced by
+# running PyInstaller on Windows. This workflow does that on GitHub's hosted
+# windows-latest runner and hands you back both tools as downloadable
+# artifacts, so no local Windows machine is required.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "spatialmedia/**"
+      - "build_executables.py"
+      - ".github/workflows/build-windows-exe.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+
+      - name: Build both executables
+        run: python build_executables.py
+
+      - name: Upload Batch Injector artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spatial-Media-Batch-Injector-windows
+          path: "dist/Spatial Media Batch Injector.exe"
+
+      - name: Upload single-file Injector artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spatial-Media-Metadata-Injector-windows
+          path: "dist/Spatial Media Metadata Injector.exe"
